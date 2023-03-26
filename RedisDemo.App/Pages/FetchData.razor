@@ -1,0 +1,80 @@
+﻿@page "/fetchdata"
+
+<PageTitle>Weather forecast</PageTitle>
+
+@using RedisDemo.App.Data
+@using RedisDemo.App.Extensions;
+@inject WeatherForecastService ForecastService
+@inject IDistributedCache CacheService
+
+<div class="container">
+    <h1>Weather forecast</h1>
+
+    <p>@loadedFrom</p>
+
+    <button @onclick="LoadDataAsync" class="btn btn-primary">Load Data</button>
+
+    @if (forecasts == null)
+    {
+        <p><em>Loading...</em></p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Temp. (C)</th>
+                    <th>Temp. (F)</th>
+                    <th>Summary</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var forecast in forecasts)
+                {
+                    <tr class="@isCachedClass">
+                        <td>@forecast.Date.ToShortDateString()</td>
+                        <td>@forecast.TemperatureC</td>
+                        <td>@forecast.TemperatureF</td>
+                        <td>@forecast.Summary</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+</div>
+
+@code {
+    private WeatherForecast[]? forecasts;
+    private string? loadedFrom;
+    private string isCachedClass = "";
+
+    //protected override async Task OnInitializedAsync()
+    //{
+    //    forecasts = await ForecastService.GetForecastAsync(DateTime.Now);
+    //}
+
+    async Task LoadDataAsync()
+    {
+        forecasts = null;
+        loadedFrom = null;
+
+        string key = "WeatherForecast_" + DateTime.Now.ToString("yyyyMMdd_hhmm");
+
+        forecasts = await CacheService.GetCacheRecordAsync<WeatherForecast[]>(key);
+
+        // cache is empty?
+        if (forecasts is null)
+        {
+            forecasts = await ForecastService.GetForecastAsync(DateTime.Now);
+            loadedFrom = $"Loaded from Weather Service API at {DateTime.Now}";
+            await CacheService.SetCacheRecordAsync<WeatherForecast[]>(key, forecasts);
+        }
+        else
+        {
+            loadedFrom = $"Loaded from Cache at {DateTime.Now}";
+            isCachedClass = "text-info";
+        }
+    }
+}
